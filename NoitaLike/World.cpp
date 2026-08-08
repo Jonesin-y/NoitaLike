@@ -9,25 +9,44 @@
 #include "MaterialRegister.h"
 #include "Chunk.h"
 #include "Cell.h"
-const int CHUNK_WIDTH = 512;
-const int CHUNK_HEIGHT = 512;
-World::World(int width,int height)
-	:m_Width(width),m_Height(height)
+const int CHUNK_MAX_WIDTH =  256;
+const int CHUNK_MAX_HEIGHT = 256;
+const int CHUNK_SHIFT = 8;
+const int ACTIVE_RECT_LENGTH = 32;
+const int ACTIVE_RECT_SHIFT = 5;
+World::World(int width, int height)
+	:m_Width(width), m_Height(height)
 {
+	m_Cells.resize(m_Width * m_Height, Cell(AIR));
+	
 	m_Shader = std::make_shared<Shader>("Assets/Shader/test.vs", "Assets/Shader/test.fs","TestShader");
 	m_VAO = std::make_shared<VertexArray>();
 	m_Texture2D = std::make_shared<Texture2D>(m_Width, m_Height);
 	m_Texture2D->Bind(0);
-	for (int x = 0;x < 1;++x)
+	for (int y = 0;y < m_Height >> CHUNK_SHIFT;++y)
 	{
-		for (int y = 0;y<1;++y)
+		for (int x = 0;x < m_Width >> CHUNK_SHIFT;++x)
 		{
-			m_Chunks.push_back(std::make_shared<Chunk>(CHUNK_WIDTH, CHUNK_WIDTH, x, y));
+			Ref(Chunk) chunk = std::make_shared<Chunk>(x * CHUNK_MAX_WIDTH,y*CHUNK_MAX_HEIGHT,(x+1)*CHUNK_MAX_WIDTH, (y+1)*CHUNK_MAX_HEIGHT, m_Width, m_Height);
+			m_Chunks.push_back(chunk);
+			if (x % 2 == 0 && y % 2 == 0)
+				m_RedChunks.push_back(chunk);
+			if(x % 2 == 0 && y % 2 == 1)
+				m_BlueChunks.push_back(chunk);
+			if (x % 2 == 1 && y % 2 == 0)
+				m_YellowChunks.push_back(chunk);
+			if (x % 2 == 1 && y % 2 == 1)
+				m_GreenChunks.push_back(chunk);
+
 		}
 	}
-	m_ChunkCountX = m_Width  / CHUNK_WIDTH;
-	m_ChunkCountY = m_Height / CHUNK_HEIGHT;
-
+	//std::cout << m_Chunks.size() << std::endl;
+	m_ActiveRectCountX = m_Width >> ACTIVE_RECT_SHIFT;
+	m_ActiveRectCountY = m_Height >> ACTIVE_RECT_SHIFT;
+	m_ActiveRects.resize(m_ActiveRectCountX * m_ActiveRectCountY, 5);
+	//m_ActiveRectData.resize(m_ActiveRectCountX * m_ActiveRectCountY, 0);
+	m_ChunkCountX = m_Width  / CHUNK_MAX_WIDTH  ;
+	m_ChunkCountY = m_Height / CHUNK_MAX_HEIGHT ;
 	glm::mat4 model(1.0f);
 	glm::mat4 view(1.0f);
 	glm::mat4 projection(1.0f);
@@ -63,95 +82,88 @@ World::World(int width,int height)
 
 void World::Update()
 {
-	for (int x = 0;x<m_ChunkCountX;++x)
+	static int Toogle = false;
+	static int current_frame = 0;
+	Toogle = !Toogle;
+	current_frame = (current_frame + 1) & 255;
+
+	//static int offset = 0;
+	//offset = rand() % 64 - 32;
+	//UpdateChunkBoundary(offset);
+
+	int leftOrRight = Toogle;
+	int startPoint = leftOrRight ? 0 : m_ChunkCountX- 1;
+	int endPoint = leftOrRight ? m_ChunkCountX : -1;
+	int step = leftOrRight ? 1 : -1;
+	for (int y = 0;y < m_ChunkCountY ;++y)
 	{
-		for (int y = 0;y < m_ChunkCountY;++y)
+		for (int x = startPoint; x != endPoint; x += step)
 		{
-			std::vector<std::tuple<int, int, Dir>> RequestCells = m_Chunks[y * m_ChunkCountX + x]->Update();
-			m_Chunks[y * m_ChunkCountX + x]->UpdateTexData();
-			m_AllRequests.insert(m_AllRequests.end(), RequestCells.begin(), RequestCells.end());
+			m_Chunks[y * m_ChunkCountX + x]->Update(m_Cells, m_ActiveRects,current_frame);
 		}
 	}
 }
 
-void World::SolveAllRequest()
-{
-	for (auto& request : m_AllRequests)
-	{
-		int global_x = std::get<0>(request);
-		int global_y = std::get<1>(request);
-		Dir direction = std::get<2>(request);
-		int chunkX = global_x >> 9;
-		int chunkY = global_y >> 9;
-		int local_x = global_x & 511;
-		int local_y = global_y & 511;
-		int mat = m_Chunks[chunkY * m_ChunkCountX + chunkX]->Cells[local_y * CHUNK_WIDTH + local_x].GetMaterial();
-		int gra = Materials::Registry[mat].gravity;
-		int den = Materials::Registry[mat].density;
+//void World::UpdateChunkBoundary(int offset)
+//{
+//	m_ChunkCutsX.clear();
+//	m_ChunkCutsY.clear();
+//	
+//	m_ChunkCutsX.push_back(0);
+//	for (int i = 1; i < m_ChunkCountX; i++) {
+//		if(i==1)
+//			m_ChunkCutsX.push_back(i * CHUNK_MAX_WIDTH + offset);
+//		else
+//			m_ChunkCutsX.push_back(m_ChunkCutsX[i-1] + CHUNK_MAX_WIDTH);
+//	}
+//	m_ChunkCutsX.push_back(m_Width);
+//
+//	m_ChunkCutsY.push_back(0);
+//	for (int i = 1; i < m_ChunkCountY; i++) {
+//		if (i == 1)
+//			m_ChunkCutsY.push_back(i * CHUNK_MAX_HEIGHT + offset);
+//		else
+//			m_ChunkCutsY.push_back(m_ChunkCutsY[i - 1] + CHUNK_MAX_HEIGHT);
+//	}
+//	m_ChunkCutsY.push_back(m_Height);
+//
+//	for (int y = 0;y < m_ChunkCountY; y++) {
+//		for (int x = 0;x < m_ChunkCountX;x++) {
+//			m_Chunks[y * m_ChunkCountX + x]->ResetBoundary(
+//				m_ChunkCutsX[x],
+//				m_ChunkCutsY[y],
+//				m_ChunkCutsX[x + 1],
+//				m_ChunkCutsY[y + 1]);
+//		}
+//
+//	}
+//		
+//}
 
-		auto TrySwap = [&](int t_chunkX, int t_chunkY, int t_x, int t_y)->bool
-			{
-				int t_mat = m_Chunks[t_chunkY * m_ChunkCountX + t_chunkX]->Cells[t_y * CHUNK_WIDTH + t_x].GetMaterial();
-				int t_den = Materials::Registry[t_mat].density;
-
-				bool can_swap = gra > 0 && den > t_den || gra < 0 && den < t_den;
-				if (can_swap)
-				{
-					m_Chunks[chunkY * m_ChunkCountX + chunkX]->is_Dirty = true;
-					m_Chunks[t_chunkY * m_ChunkCountX + t_chunkX]->is_Dirty = true;
-					Cell temp = m_Chunks[chunkY * m_ChunkCountX + chunkX]->Cells[local_y * CHUNK_WIDTH + local_x];
-					m_Chunks[chunkY * m_ChunkCountX + chunkX]->Cells[local_y * CHUNK_WIDTH + local_x] = m_Chunks[t_chunkY * m_ChunkCountX + t_chunkX]->Cells[t_y * CHUNK_WIDTH + t_x];
-					m_Chunks[t_chunkY * m_ChunkCountX + t_chunkX]->Cells[t_y * CHUNK_WIDTH + t_x] = temp;
-					m_Chunks[t_chunkY * m_ChunkCountX + t_chunkX]->Cells[t_y * CHUNK_WIDTH + t_x].SetUpdated(true);
-					m_Chunks[chunkY * m_ChunkCountX + chunkX]->Cells[local_y * CHUNK_WIDTH + local_x].SetUpdated(true);
-					return true;
-				}
-				else
-					return false;
-			};
-		
-		int global_tar_x = global_x;
-		int global_tar_y = global_y;
-		switch (direction)
-		{
-		case LEFT:  global_tar_x = global_x - 1;break;
-		case RIGHT:	global_tar_x = global_x + 1;break;
-		case DOWN:  global_tar_y = global_y - 1;break;
-		case UP:	global_tar_y = global_y + 1;break;
-		}
-		int local_tar_x = global_tar_x & 511;
-		int local_tar_y = global_tar_y & 511;
-		int tar_chunkX = global_tar_x >> 9;
-		int tar_chunkY = global_tar_y >> 9;
-		if (global_tar_x < 0 || global_tar_x >= m_Width || global_tar_y < 0 || global_tar_y >= m_Height)
-		{
-			m_Chunks[chunkY * m_ChunkCountX + chunkX]->Cells[local_y * CHUNK_WIDTH + local_x].SetMoving(false);
-			continue;
-		}
-		if(TrySwap(tar_chunkX,tar_chunkY,global_tar_x,global_tar_y))
-			m_Chunks[chunkY * m_ChunkCountX + chunkX]->Cells[local_y * CHUNK_WIDTH + local_x].SetMoving(true);
-		else
-			m_Chunks[chunkY * m_ChunkCountX + chunkX]->Cells[local_y * CHUNK_WIDTH + local_x].SetMoving(false);
-	}
-	m_AllRequests.clear();
-}
 
 void World::Render()
 {
+
 	m_Shader->Bind();
 	m_VAO->Bind();
 	m_Texture2D->Bind(0);
 	
-	for (int x = 0;x < m_ChunkCountX;++x)
+	for (int y = 0;y < m_ChunkCountY;++y)
 	{
-		for (int y = 0;y < m_ChunkCountY;++y)
+		for (int x = 0;x < m_ChunkCountX;++x)
 		{
 			if (!m_Chunks[y * m_ChunkCountX + x]->is_Dirty)
 				continue;
-			m_Texture2D->SubImage2D(x * CHUNK_WIDTH,y*CHUNK_HEIGHT,CHUNK_WIDTH,CHUNK_HEIGHT,m_Chunks[y * m_ChunkCountX + x]->TexData.data());
+			m_Chunks[y * m_ChunkCountX + x]->UpdateTexData(m_Cells);
+			int chunk_width = m_Chunks[y * m_ChunkCountX + x]->end_x - m_Chunks[y * m_ChunkCountX + x]->start_x;
+			int chunk_height = m_Chunks[y * m_ChunkCountX + x]->end_y - m_Chunks[y * m_ChunkCountX + x]->start_y;
+			int textureXChunk = m_Chunks[y * m_ChunkCountX + x]->start_x;
+			int textureYChunk = m_Height - m_Chunks[y * m_ChunkCountX + x]->end_y;;
+			m_Texture2D->SubImage2D(textureXChunk,textureYChunk,chunk_width,chunk_height,m_Chunks[y * m_ChunkCountX + x]->TexData.data());
 			m_Chunks[y * m_ChunkCountX + x]->is_Dirty = false;
 		}
 	}
+
 	glDrawElements(GL_TRIANGLES,6,GL_UNSIGNED_INT,nullptr);
 }
 
@@ -168,17 +180,35 @@ void World::SetCircleCells(int worldx, int worldy, int radius, Cell cell)
 			int dx = x - worldx;
 			int dy = y - worldy;
 			if (dx * dx + dy * dy <= radius * radius)
-			{
-				int localX = x & 511;
-				int localY = y & 511;
-				int chunkX = x >> 9;
-				int chunkY = y >> 9;
-				m_Chunks[chunkY * m_ChunkCountX + chunkX]->Cells[localY * CHUNK_WIDTH + localX] = cell;
-				m_Chunks[chunkY * m_ChunkCountX + chunkX]->is_Dirty = true;
+				m_Cells[y * m_Width + x] = cell;
+			else
+				continue;
+		}
+	}
+}
 
+void World::SetRandomScaleCells(int worldx, int worldy, int radius,Cell cell)
+{
+	int startX = std::max(0, worldx - radius);
+	int endX = std::min(m_Width, worldx + radius);
+	int startY = std::max(0, worldy - radius);
+	int endY = std::min(m_Height, worldy + radius);
+	for (int x = startX; x < endX;++x)
+	{
+		for (int y = startY; y < endY;++y)
+		{
+			int dx = x - worldx;
+			int dy = y - worldy;
+			if (rand() % 100 < 4 && dx * dx + dy * dy <= radius * radius)
+			{
+				int rect_x = x >> ACTIVE_RECT_SHIFT;
+				int rect_y = y >> ACTIVE_RECT_SHIFT;
+				m_ActiveRects[rect_y * (m_Width >> ACTIVE_RECT_SHIFT) + rect_x] = 5;
+				m_Cells[y * m_Width + x] = cell;
 			}
 			else
 				continue;
 		}
 	}
 }
+

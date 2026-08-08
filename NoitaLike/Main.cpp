@@ -113,14 +113,14 @@ int main()
 		currentTime = glfwGetTime();
 		accumulator += deltaTime;
 		glfwPollEvents();
-		glClear(GL_COLOR_BUFFER_BIT);
 		if (accumulator >= FIXED_FRAME)
 		{
-			accumulator = 0;
+			accumulator -= FIXED_FRAME;
 			NoitaLike.ProcessInput();
 			NoitaLike.Update();
-			NoitaLike.Render();
 		}
+		glClear(GL_COLOR_BUFFER_BIT);
+		NoitaLike.Render();
 
 		glfwSwapBuffers(window);
 	}

@@ -31,16 +31,54 @@ void Game::ProcessInput()
 		glm::vec4 ndcPos = glm::vec4(ndc_x, ndc_y, 0.0f, 1.0f);
 		glm::vec4 FinalCursorPos = inverseProjection * inverseView * ndcPos;
 		//printf("鼠标左键触发!坐标:%d,%d\n", (int)FinalCursorPos.x, (int)FinalCursorPos.y);
-		m_World->SetCircleCells((int)FinalCursorPos.x, (int)FinalCursorPos.y, 5,m_Material);
+		m_World->SetRandomScaleCells((int)FinalCursorPos.x, (int)FinalCursorPos.y, 20,m_Material);
+		//m_World->SetCircleCells((int)FinalCursorPos.x, (int)FinalCursorPos.y, 5, m_Material);
 	}
-	if (Keys[GLFW_KEY_W] == true && ProcessedKeys[GLFW_KEY_W] == false)
+	if (Keys[GLFW_KEY_0] == true && ProcessedKeys[GLFW_KEY_0] == false)
 	{
-		m_Material = m_Material % 4 + 1;
+		m_Material = 1;
 		std::cout << m_Material << std::endl;
-		ProcessedKeys[GLFW_KEY_W] = true;
+		ProcessedKeys[GLFW_KEY_0] = true;
 	}
-	else if (Keys[GLFW_KEY_W] == false && ProcessedKeys[GLFW_KEY_W] == true)
-		ProcessedKeys[GLFW_KEY_W] = false;
+	else if (Keys[GLFW_KEY_0] == false && ProcessedKeys[GLFW_KEY_0] == true)
+		ProcessedKeys[GLFW_KEY_0] = false;
+
+	if (Keys[GLFW_KEY_1] == true && ProcessedKeys[GLFW_KEY_1] == false)
+	{
+		m_Material = 2;
+		std::cout << m_Material << std::endl;
+		ProcessedKeys[GLFW_KEY_1] = true;
+	}
+	else if (Keys[GLFW_KEY_1] == false && ProcessedKeys[GLFW_KEY_1] == true)
+		ProcessedKeys[GLFW_KEY_1] = false;
+
+	if (Keys[GLFW_KEY_2] == true && ProcessedKeys[GLFW_KEY_2] == false)
+	{
+		m_Material = 3;
+		std::cout << m_Material << std::endl;
+		ProcessedKeys[GLFW_KEY_2] = true;
+	}
+	else if (Keys[GLFW_KEY_2] == false && ProcessedKeys[GLFW_KEY_2] == true)
+		ProcessedKeys[GLFW_KEY_2] = false;
+
+	if (Keys[GLFW_KEY_3] == true && ProcessedKeys[GLFW_KEY_3] == false)
+	{
+		m_Material = 4;
+		std::cout << m_Material << std::endl;
+		ProcessedKeys[GLFW_KEY_3] = true;
+	}
+	else if (Keys[GLFW_KEY_3] == false && ProcessedKeys[GLFW_KEY_3] == true)
+		ProcessedKeys[GLFW_KEY_3] = false;
+
+	if (Keys[GLFW_KEY_4] == true && ProcessedKeys[GLFW_KEY_4] == false)
+	{
+		m_Material = 5;
+		std::cout << m_Material << std::endl;
+		ProcessedKeys[GLFW_KEY_4] = true;
+	}
+	else if (Keys[GLFW_KEY_4] == false && ProcessedKeys[GLFW_KEY_4] == true)
+		ProcessedKeys[GLFW_KEY_4] = false;
+
 }
 
 void Game::Render()
@@ -51,5 +89,4 @@ void Game::Render()
 void Game::Update()
 {
 	m_World->Update();
-	m_World->SolveAllRequest();
 }

@@ -7,7 +7,7 @@ class World;
 class Game
 {
 public:
-	Game(int width, int height, int windowWidth,int w什indowHeight,const std::string& name);
+	Game(int width, int height, int windowWidth,int windowHeight,const std::string& name);
 	bool MouseButton[16] = { false };
 	bool Keys[1024] = { false };
 	bool ProcessedKeys[1024] = { false };

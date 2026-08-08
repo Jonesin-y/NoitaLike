@@ -11,6 +11,7 @@
 #include<memory>
 #include<algorithm>
 #include<functional>
+#include<random>
 
 //data structures
 #include<tuple>
