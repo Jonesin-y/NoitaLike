@@ -141,7 +141,7 @@ void World::Update()
 //}
 
 
-void World::Render()
+void World::Render(float deltaTime)
 {
 
 	m_Shader->Bind();
@@ -154,7 +154,7 @@ void World::Render()
 		{
 			if (!m_Chunks[y * m_ChunkCountX + x]->is_Dirty)
 				continue;
-			m_Chunks[y * m_ChunkCountX + x]->UpdateTexData(m_Cells);
+			m_Chunks[y * m_ChunkCountX + x]->UpdateTexData(m_Cells,deltaTime);
 			int chunk_width = m_Chunks[y * m_ChunkCountX + x]->end_x - m_Chunks[y * m_ChunkCountX + x]->start_x;
 			int chunk_height = m_Chunks[y * m_ChunkCountX + x]->end_y - m_Chunks[y * m_ChunkCountX + x]->start_y;
 			int textureXChunk = m_Chunks[y * m_ChunkCountX + x]->start_x;
@@ -179,8 +179,15 @@ void World::SetCircleCells(int worldx, int worldy, int radius, Cell cell)
 		{
 			int dx = x - worldx;
 			int dy = y - worldy;
-			if (dx * dx + dy * dy <= radius * radius)
+			if (dx * dx + dy * dy <= radius * radius) {
+				int rect_x = x >> ACTIVE_RECT_SHIFT;
+				int rect_y = y >> ACTIVE_RECT_SHIFT;
+				int chunk_x = x >> CHUNK_SHIFT;
+				int chunk_y = y >> CHUNK_SHIFT;
+				m_ActiveRects[rect_y * (m_Width >> ACTIVE_RECT_SHIFT) + rect_x] = 5;
+				m_Chunks[chunk_y * m_ChunkCountX + chunk_x]->is_Dirty = true;
 				m_Cells[y * m_Width + x] = cell;
+			}
 			else
 				continue;
 		}
@@ -203,7 +210,10 @@ void World::SetRandomScaleCells(int worldx, int worldy, int radius,Cell cell)
 			{
 				int rect_x = x >> ACTIVE_RECT_SHIFT;
 				int rect_y = y >> ACTIVE_RECT_SHIFT;
+				int chunk_x = x >> CHUNK_SHIFT;
+				int chunk_y = y >> CHUNK_SHIFT;
 				m_ActiveRects[rect_y * (m_Width >> ACTIVE_RECT_SHIFT) + rect_x] = 5;
+				m_Chunks[chunk_y * m_ChunkCountX + chunk_x]->is_Dirty = true;
 				m_Cells[y * m_Width + x] = cell;
 			}
 			else

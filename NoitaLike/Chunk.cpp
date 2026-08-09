@@ -85,13 +85,19 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 			int current_cell_gravity = Materials::Registry[material].gravity;//计算当前Cell的重力
 			int current_cell_slide_probility = Materials::Registry[material].slide_probility;//计算当前Cell的滑落概率
 			int current_cell_slip_probility = Materials::Registry[material].slip_probility;//计算当前Cell在水中的平移概率
-			int current_cell_fall_speed = Materials::Registry[material].fall_speed;
-			int current_cell_flow_speed = Materials::Registry[material].flow_speed;
+			int current_cell_disappear_probility = Materials::Registry[material].disappear_probility;//计算当前Cell的消失概率
+			int current_cell_smoke_emission = Materials::Registry[material].smoke_emission;//计算当前Cell的烟雾产生概率
+			int current_cell_vaporize = Materials::Registry[material].vaporize;//计算当前Cell的蒸发概率
+			int current_cell_flammability = Materials::Registry[material].flammability;//计算当前Cell的易燃性
+			int current_cell_t_speed = Materials::Registry[material].t_speed;
+			int current_cell_s_speed = Materials::Registry[material].s_speed;
 			float current_cell_density = Materials::Registry[material].density;//计算当前Cell的密度
-			bool is_liquid = Materials::Registry[material].is_liquid;//判断当前cell是不是流体
+			bool current_cell_is_liquid = Materials::Registry[material].is_liquid;//判断当前cell是不是流体
+			bool current_cell_is_fire = Materials::Registry[material].is_fire;//判断当前cell是不是火焰
+			bool current_cell_is_gas = Materials::Registry[material].is_gas;//判断当前cell是不是气体
 
 			
-			if (current_cell_gravity == 0)
+			if (current_cell_gravity == 0 && !current_cell_is_fire)
 				continue;
 			
 			auto TrySwap = [&](int global_curr_x,int global_curr_y,int global_tar_x, int global_tar_y)->bool
@@ -101,22 +107,25 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 					if (global_tar_x < 0 || global_tar_x >= world_width || global_tar_y < 0 || global_tar_y >= world_height)//越界了就不处理
 						return false;
 					int   curr_mat = global_cells[global_curr_y * world_width + global_curr_x].GetMaterial();
-					int   curr_gen = Materials::Registry[curr_mat].gravity;
+					int   curr_gra = Materials::Registry[curr_mat].gravity;
 					bool  curr_liquid = Materials::Registry[curr_mat].is_liquid;
 					int   curr_viscosity = Materials::Registry[curr_mat].viscosity;
+					int   curr_vaporize = Materials::Registry[curr_mat].vaporize;
+					int   curr_flammability = Materials::Registry[curr_mat].flammability;
 					float curr_den = Materials::Registry[curr_mat].density;
 					//获取目标Cell的信息
 					int   tar_mat = global_cells[global_tar_y * world_width + global_tar_x].GetMaterial();
 					bool  tar_liquid = Materials::Registry[tar_mat].is_liquid;
+					bool  tar_fire = Materials::Registry[tar_mat].is_fire;
+					bool  tar_gas = Materials::Registry[tar_mat].is_gas;
 					int   tar_viscosity = Materials::Registry[tar_mat].viscosity;
 					float tar_den = Materials::Registry[tar_mat].density;
 
-					bool canSwap = (curr_gen > 0 && curr_den > tar_den)
-						|| (curr_gen < 0 && curr_den < tar_den);
+					bool canSwap = (curr_gra > 0 && curr_den > tar_den)|| (curr_gra < 0 && curr_den < tar_den);
 					
 					if (canSwap)
 					{
-						if (tar_liquid && (rand() % 100) < tar_viscosity)//如果被液体阻滞就不下降
+						if (tar_liquid && !current_cell_is_gas && (rand() % 100) < tar_viscosity)//液体黏度阻滞固体/液体；气体上浮不受水黏度随机卡住
 							return true;
 						auto WakeUp = [&](int global_x,int global_y)->bool
 							{
@@ -131,7 +140,7 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 								return true;
 								};
 						is_Dirty = true;
-						if (tar_mat == AIR || (tar_liquid && curr_den > tar_den))
+						if (tar_mat == AIR || (tar_liquid && curr_den > tar_den) || (tar_gas && !curr_liquid &&curr_den > tar_den))
 						{
 							global_cells[global_curr_y * world_width + global_curr_x].SetCurrentFrame(current_frame);
 						}
@@ -142,35 +151,44 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 						}
 						global_cells[global_curr_y * world_width + global_curr_x].SetUpdated(true);
 						global_cells[global_tar_y * world_width + global_tar_x].SetUpdated(true);
-						
-						Cell temp = global_cells[global_curr_y * world_width + global_curr_x];
-						global_cells[global_curr_y * world_width + global_curr_x] = global_cells[global_tar_y * world_width + global_tar_x];
-						global_cells[global_tar_y * world_width + global_tar_x] = temp;
+						if (tar_mat != FIRE)//如果目标不是火焰，就交换位置
+						{
+							Cell temp = global_cells[global_curr_y * world_width + global_curr_x];
+							global_cells[global_curr_y * world_width + global_curr_x] = global_cells[global_tar_y * world_width + global_tar_x];
+							global_cells[global_tar_y * world_width + global_tar_x] = temp;
+						}
+						else if (tar_mat == FIRE && !current_cell_is_gas && curr_flammability <= 0 && curr_vaporize <= 0)//如果目标是火焰，并且当前不是气体，并且不可燃，不可蒸发,则扑灭火焰
+						{
+							global_cells[global_tar_y * world_width + global_tar_x]= global_cells[global_curr_y * world_width + global_curr_x];
+							global_cells[global_curr_y * world_width + global_curr_x].SetMaterial(AIR);
+						}
+						else if (tar_mat == FIRE && !current_cell_is_gas && curr_vaporize > 0)//如果目标是火焰，并且当前不是气体，并且可蒸发，则生成对应气体
+						{
+							global_cells[global_curr_y * world_width + global_curr_x].SetMaterial(AIR);
+							unsigned int relevant_material = Materials::Registry[curr_mat].relevant_material;
+							global_cells[global_tar_y * world_width + global_tar_x].SetMaterial(relevant_material);
+							global_cells[global_tar_y * world_width + global_tar_x].SetColorVariation(rand() & (Materials::Registry[relevant_material].color_var - 1));
 
+						}
 						WakeUp(global_tar_x + 1, global_tar_y);
 						WakeUp(global_tar_x - 1, global_tar_y);
 						WakeUp(global_tar_x, global_tar_y + 1);
 						WakeUp(global_tar_x, global_tar_y - 1);
-						//WakeUp(global_tar_x + 1, global_tar_y + 1);
-						//WakeUp(global_tar_x - 1, global_tar_y - 1);
-						//WakeUp(global_tar_x - 1, global_tar_y + 1);
-						//WakeUp(global_tar_x + 1, global_tar_y - 1);
+						
 
 						WakeUp(global_curr_x + 1, global_curr_y);
 						WakeUp(global_curr_x - 1, global_curr_y);
 						WakeUp(global_curr_x, global_curr_y + 1);
 						WakeUp(global_curr_x, global_curr_y - 1);
-						//WakeUp(global_curr_x + 1, global_curr_y + 1);
-						//WakeUp(global_curr_x - 1, global_curr_y - 1);
-						//WakeUp(global_curr_x - 1, global_curr_y + 1);
-						//WakeUp(global_curr_x + 1, global_curr_y - 1);
-
+						
+						
 						return true;
 					}
 					else
 						return false;
 
 				};
+			
 				auto RayCastMove = [&](int global_start_x, int global_start_y, int global_target_x, int global_target_y)->bool//返回true表示被处理
 					{
 						if (global_start_x == global_target_x && global_start_y == global_target_y) return false;
@@ -198,19 +216,34 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 							// 碰撞检测逻辑（复用之前的密度判定）
 							int check_mat = global_cells[global_current_y * world_width + global_current_x].GetMaterial();	//不越界时的默认值
 							bool check_locked = (global_cells[global_current_y * world_width + global_current_x].GetCurrentFrame() == current_frame);//不越界时的默认值
-							int check_is_liquid = Materials::Registry[check_mat].is_liquid;
+							int check_current_cell_is_liquid = Materials::Registry[check_mat].is_liquid;
+							int check_current_cell_is_fire = Materials::Registry[check_mat].is_fire;
+							int check_current_cell_is_gas= Materials::Registry[check_mat].is_gas;
+
 							float check_den= Materials::Registry[check_mat].density;
+							if (check_current_cell_is_fire && current_cell_flammability <= 0)//直接将火焰所在位置标记为最后有效位置，防止不可燃物被火焰阻挡
+							{
+								global_last_valid_x = global_current_x;
+								global_last_valid_y = global_current_y;
+								break;
+							}
 							if (check_locked)
 							{
-								bool can_ignore_locked = check_is_liquid && !is_liquid && current_cell_density > check_den;
+								bool can_ignore_locked = (check_mat == AIR) ||
+									(check_current_cell_is_liquid && !current_cell_is_liquid && !current_cell_is_gas && current_cell_density > check_den) ||//如果检查体素为液体，那么只有当前体素为固体并且密度大于检查体素时，才能忽视锁死
+									(check_current_cell_is_gas && !current_cell_is_gas  && current_cell_density > check_den);//如果检查体素为气体，那么只有当当前体素为固体且密度大于检查体素时，才能忽视锁死
 								// 如果目标不能忽视锁死，直接撞墙停止
+								if (current_cell_is_gas && check_current_cell_is_liquid)
+									can_ignore_locked = true;
 								if (!can_ignore_locked)
 									break;
 							}
 							// 检查是否能穿透（空气，或者密度更小的液体）
 							bool can_penetrate = (check_mat == AIR) ||
-								(current_cell_density >= check_den&& Materials::Registry[check_mat].is_liquid);
+								(current_cell_density >= check_den && check_current_cell_is_liquid);
 
+							if (current_cell_is_gas && check_current_cell_is_liquid)
+								can_penetrate = true;
 							if (can_penetrate) {
 								// 安全，记录为最后一个合法落脚点
 								global_last_valid_x = global_current_x;
@@ -233,17 +266,107 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 
 						return false;
 					};
+				auto TryGenerate = [&](int global_tar_x, int global_tar_y, unsigned int type)->bool
+					{
+						if (global_tar_x < 0 || global_tar_x >= world_width || global_tar_y < 0 || global_tar_y >= world_height)//越界了就不处理
+							return false;
+						auto WakeUp = [&](int global_x, int global_y)->bool
+							{
+								if (global_x < 0 || global_x >= world_width || global_y < 0 || global_y >= world_height)//越界了就不处理
+									return false;
+								Cell* wCell = &global_cells[global_y * world_width + global_x];
+
+								wCell->SetFreeFalling(true);
+								wCell->SetSliping(true);
+								active_rects[GetRelevantRectIndex(global_x, global_y)] = 5;
+								//wCell->SetMoving(true);
+								return true;
+							};
+						is_Dirty = true;
+						WakeUp(global_tar_x, global_tar_y);
+						global_cells[global_tar_y * world_width + global_tar_x].SetMaterial(type);
+						global_cells[global_tar_y * world_width + global_tar_x].SetColorVariation(rand() & (Materials::Registry[type].color_var - 1));
+
+						return true;
+					};
+				auto RayCastGenerate = [&](int global_start_x, int global_start_y, int global_target_x, int global_target_y)->bool
+					{
+						if (!current_cell_is_fire)return false;//如果不是火焰就跳过，防止占据计算性能，以后引入酸液等
+						if (global_start_x == global_target_x && global_start_y == global_target_y) return false;
+						int dx = std::abs(global_target_x - global_start_x);
+						int dy = std::abs(global_target_y - global_start_y);
+						int sx = (global_target_x - global_start_x) > 0 ? 1 : -1;
+						int sy = (global_target_y - global_start_y) > 0 ? 1 : -1;
+						int err = dx - dy;
+
+						int global_current_x = global_start_x;//记录当前检测位置的游标
+						int global_current_y = global_start_y;//记录当前检测位置的游标
+
+						int global_last_valid_x = global_start_x;
+						int global_last_valid_y = global_start_y;
+
+						unsigned int final_mat = AIR;//设置默认最终生成材质为AIR
+						unsigned int final_probility = 0;//设置默认生成概率为0
+						//沿着射线步进探测
+						while (true) {
+							// 前进一步 (Bresenham 核心逻辑)
+							int e2 = 2 * err;
+							if (e2 > -dy) { err -= dy; global_current_x += sx; }
+							if (e2 < dx) { err += dx;  global_current_y += sy; }
+							// 检查越界（直接当做撞墙处理）
+							if (global_current_x < 0 || global_current_x >= world_width || global_current_y < 0 || global_current_y >= world_height)
+								break;
+							// 检查是否能生成
+							int check_mat = global_cells[global_current_y * world_width + global_current_x].GetMaterial();	//不越界时的默认值
+							int check_fammablity= Materials::Registry[check_mat].flammability;
+							int check_vaporize = Materials::Registry[check_mat].vaporize;
+							if (current_cell_is_fire){
+								if (check_fammablity) {//如果检查位置材质可燃，则将最终材质设为火焰
+									global_last_valid_x = global_current_x;
+									global_last_valid_y = global_current_y;
+									final_mat = FIRE;
+									final_probility = check_fammablity;
+								}
+								else if (check_mat == AIR) {//如果检查位置材质是空气，则将最终材质设为烟雾
+									global_last_valid_x = global_current_x;
+									global_last_valid_y = global_current_y;
+									final_mat = SMOKE;
+									final_probility = current_cell_smoke_emission;
+								}
+								else if (check_vaporize > 0) {//如果检查位置材质可蒸发，则将最终材质设为对应气体
+									global_last_valid_x = global_current_x;
+									global_last_valid_y = global_current_y;
+									final_mat = Materials::Registry[check_mat].relevant_material;
+									final_probility = check_vaporize;
+
+								}
+								else
+									break;
+							}
+							// 如果到达了理想终点，结束探测
+							if (global_current_x == global_target_x && global_current_y == global_target_y) break;
+						}
+						//执行单次生成体素
+						if (global_last_valid_x != global_start_x || global_last_valid_y != global_start_y) {
+							// 调用之前的 TryGenerate，但现在只执行一次远距离 Generate
+							if (final_mat != AIR && rand() % 200 < final_probility) {
+								return TryGenerate(global_last_valid_x, global_last_valid_y, final_mat);
+							}
+						}
+
+						return false;
+					};
 			int dir1 = (rand() % 2 == 0) ? -1 : 1;
 			int dir2 = -dir1;
 			if (rand() % 100 < current_cell_turbulence)//如果当前Cell有流动，在优先往斜向移动
 			{
-				if (RayCastMove(x,y,x + (dir1 * current_cell_flow_speed), y - current_cell_gravity * current_cell_fall_speed))
+				if (RayCastMove(x,y,x + (dir1 * current_cell_s_speed), y - current_cell_gravity * current_cell_t_speed))
 					continue;
-				else if (RayCastMove(x,y,x + (dir2 * current_cell_flow_speed), y - current_cell_gravity * current_cell_fall_speed))
+				else if (RayCastMove(x,y,x + (dir2 * current_cell_s_speed), y - current_cell_gravity * current_cell_t_speed))
 					continue;
-				else if (RayCastMove(x, y, x, y - current_cell_gravity * current_cell_fall_speed))
+				else if (RayCastMove(x, y, x, y - current_cell_gravity * current_cell_t_speed))
 				{
-					if (!is_liquid)
+					if (!current_cell_is_liquid)
 					{
 						if (rand() % 100 < current_cell_slide_probility)//如果小于当前cell的滑动概率，就将其FreeFalling设置为false,反之则斜向滑动
 							global_cells[y * world_width + x].SetFreeFalling(false);
@@ -251,9 +374,9 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 					}
 					continue;
 				}
-				else if (is_liquid && RayCastMove(x, y, x + (dir1 * current_cell_flow_speed),y))
+				else if ((current_cell_is_liquid || current_cell_is_gas) && RayCastMove(x, y, x + (dir1 * current_cell_s_speed),y))
 					continue;
-				else if (is_liquid && RayCastMove(x, y, x + (dir2 * current_cell_flow_speed), y))
+				else if ((current_cell_is_liquid || current_cell_is_gas) && RayCastMove(x, y, x + (dir2 * current_cell_s_speed), y))
 					continue;
 				//else
 					//active_rect_data[GetRelevantRectIndex(x, y)] -= 1;
@@ -261,13 +384,13 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 			}
 			else if((y - 1) >= 0 && (y - 1) < world_height && global_cells[(y-1) * world_width + x].GetUpdated())//如果下方的体素刚刚被处理过，就优先尝试斜向交换
 			{
-				if (RayCastMove(x, y, x + (dir1 * current_cell_flow_speed), y - current_cell_gravity * current_cell_fall_speed))
+				if (RayCastMove(x, y, x + (dir1 * current_cell_s_speed), y - current_cell_gravity * current_cell_t_speed))
 					continue;
-				else if (RayCastMove(x, y, x + (dir2 * current_cell_flow_speed), y - current_cell_gravity * current_cell_fall_speed))
+				else if (RayCastMove(x, y, x + (dir2 * current_cell_s_speed), y - current_cell_gravity * current_cell_t_speed))
 					continue;
-				else if (RayCastMove(x, y, x, y - current_cell_gravity * current_cell_fall_speed))
+				else if (RayCastMove(x, y, x, y - current_cell_gravity * current_cell_t_speed))
 				{
-					if (!is_liquid)
+					if (!current_cell_is_liquid)
 					{
 						if (rand() % 100 < current_cell_slide_probility)//如果小于当前cell的滑动概率，就将其FreeFalling设置为false,反之则斜向滑动
 							global_cells[y * world_width + x].SetFreeFalling(false);
@@ -275,9 +398,9 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 					}
 					continue;
 				}
-				else if (is_liquid && RayCastMove(x, y, x + (dir1 * current_cell_flow_speed), y))
+				else if ((current_cell_is_liquid || current_cell_is_gas) && RayCastMove(x, y, x + (dir1 * current_cell_s_speed), y))
 					continue;
-				else if (is_liquid && RayCastMove(x, y, x + (dir2 * current_cell_flow_speed), y))
+				else if ((current_cell_is_liquid || current_cell_is_gas) && RayCastMove(x, y, x + (dir2 * current_cell_s_speed), y))
 					continue;
 				//else
 					//active_rect_data[GetRelevantRectIndex(x, y)] -= 1;
@@ -285,9 +408,9 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 			}
 			else
 			{
-				if (RayCastMove(x, y, x, y - current_cell_gravity * current_cell_fall_speed))
+				if (RayCastMove(x, y, x, y - current_cell_gravity * current_cell_t_speed))
 					continue;
-				if (!is_liquid)
+				if (!current_cell_is_liquid)
 				{
 					if (rand() % 100 < current_cell_slide_probility)//如果小于当前cell的滑动概率，就将其FreeFalling设置为false,反之则斜向滑动
 						global_cells[y * world_width + x].SetFreeFalling(false);
@@ -295,18 +418,18 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 				}
 				if (global_cells[y * world_width + x].GetFreeFalling())
 				{
-					if (RayCastMove(x, y, x + (dir1 * current_cell_flow_speed), y - current_cell_gravity * current_cell_fall_speed))
+					if (RayCastMove(x, y, x + (dir1 * current_cell_s_speed), y - current_cell_gravity * current_cell_t_speed))
 						continue;
-					else if (RayCastMove(x, y, x + (dir2 * current_cell_flow_speed), y - current_cell_gravity * current_cell_fall_speed))
+					else if (RayCastMove(x, y, x + (dir2 * current_cell_s_speed), y - current_cell_gravity * current_cell_t_speed))
 						continue;
 				}
-				if (is_liquid && RayCastMove(x, y, x + (dir1 * current_cell_flow_speed), y)) 	continue;
-				else if (is_liquid && RayCastMove(x, y, x + (dir2 * current_cell_flow_speed), y))continue;
+				if ((current_cell_is_liquid || current_cell_is_gas) && RayCastMove(x, y, x + (dir1 * current_cell_s_speed), y)) 	continue;
+				else if ((current_cell_is_liquid || current_cell_is_gas) && RayCastMove(x, y, x + (dir2 * current_cell_s_speed), y))continue;
 				//else
 					//active_rect_data[GetRelevantRectIndex(x, y)] -= 1;
 
 			}
-			if (!is_liquid)
+			if (!current_cell_is_liquid)
 			{
 				auto TrySlip = [&](int slip_x) {
 					int side_mat;
@@ -318,7 +441,8 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 						// 只有当侧面是液体，且自身密度大于侧面液体密度时，才允许水平挤压
 					}
 					
-					if (Materials::Registry[side_mat].is_liquid && current_cell_density > Materials::Registry[side_mat].density) {
+					if (Materials::Registry[side_mat].is_liquid && current_cell_density > Materials::Registry[side_mat].density
+						|| Materials::Registry[side_mat].is_liquid && current_cell_is_gas && current_cell_density < Materials::Registry[side_mat].density) {
 						return RayCastMove(x, y, slip_x, y);
 
 					}
@@ -331,20 +455,29 @@ void Chunk::Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_
 				// 尝试向左右两侧的水中溃散
 				if (global_cells[y * world_width + x].GetSliping())
 				{
-					if (TrySlip(x + dir1 * current_cell_flow_speed))
+					if (TrySlip(x + dir1 * current_cell_s_speed))
 						continue;
-					else if (TrySlip(x + dir2 * current_cell_flow_speed))
+					else if (TrySlip(x + dir2 * current_cell_s_speed))
 						continue; 
 				}
 			}
 			//active_rect_data[GetRelevantRectIndex(x, y)] -= 1;
-			
-			
+			if (current_cell_is_fire)
+			{
+				is_Dirty = true;
+				active_rects[GetRelevantRectIndex(x, y)] = 5;
+				RayCastGenerate(x,y,x+current_cell_s_speed,y);
+				RayCastGenerate(x,y,x-current_cell_s_speed,y);
+				RayCastGenerate(x,y,x,y+current_cell_t_speed);
+				RayCastGenerate(x,y,x,y-current_cell_t_speed);
+			}
+			if(rand()%100 < current_cell_disappear_probility)
+				global_cells[y * world_width + x].SetMaterial(AIR);
 		}
 	}
 };
 
-void Chunk::UpdateTexData(std::vector<Cell>& global_cells)
+void Chunk::UpdateTexData(std::vector<Cell>& global_cells, float deltaTime)
 {
 	TexData.clear();
 	auto ClampColor = [](uint32_t value)->uint32_t
@@ -360,8 +493,8 @@ void Chunk::UpdateTexData(std::vector<Cell>& global_cells)
 			if (Materials::Registry[global_cells[y * world_width + x].GetMaterial()].color_var == 0) { TexData.push_back(Materials::Registry[global_cells[y * world_width + x].GetMaterial()].color); continue; }
 			//因为AIR的color_var为0，不能和其余体素共用一套逻辑，直接传入颜色为纯色就行
 			uint32_t initial_color = Materials::Registry[global_cells[y * world_width + x].GetMaterial()].color;
-			if( global_cells[y * world_width + x].GetColorVariation() == 0)
-				global_cells[y * world_width + x].SetColorVariation(rand() & (Materials::Registry[global_cells[y * world_width + x].GetMaterial()].color_var - 1));
+			if( global_cells[y * world_width + x].GetColorVariation() == 0 || global_cells[y * world_width + x].GetMaterial() == FIRE)
+				global_cells[y * world_width + x].SetColorVariation(rand() & (Materials::Registry[global_cells[y * world_width + x].GetMaterial()].color_var - 1));//如果当前体素的颜色变化值为0，就随机生成一个颜色变化值
 			uint32_t color_raw = global_cells[y * world_width + x].GetColorVariation();
 			uint32_t final_R = ClampColor((initial_color & 0xFF) + color_raw);
 			uint32_t final_G = ClampColor(((initial_color >> 8) & 0xFF) + color_raw);

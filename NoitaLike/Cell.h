@@ -17,7 +17,7 @@ public:
 		cell |= 1U << 7;
 	}
 	//Setter
-	inline void SetMaterial(unsigned int type){cell = (cell & (~(0xFFU << 24))) | (type&0xFFU << 24);}
+	inline void SetMaterial(unsigned int type){cell = (cell & (~(0xFFU << 24))) | ((type&0xFFU) << 24);}
 	inline void SetColorVariation(unsigned int colorvariation){cell = (cell & (~(0xFFU << 16))) | (colorvariation << 16);}//暂时删除，后续也许会修改这八位的作用
 	inline void SetMoving(bool is_moving) 
 	{

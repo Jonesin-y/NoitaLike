@@ -22,7 +22,7 @@ public:
 	std::vector<uint32_t>TexData;
 	Chunk(int startx,int starty,int endx,int endy,int worldwidth,int worldheight);
 	void Update(std::vector<Cell>& global_cells,std::vector<uint8_t>& active_rects,unsigned int current_frame);
-	void UpdateTexData(std::vector<Cell>& global_cells);
+	void UpdateTexData(std::vector<Cell>& global_cells, float deltaTime);
 	void ResetBoundary(int startx,int starty,int endx,int endy);
 	
 	

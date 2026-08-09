@@ -14,7 +14,7 @@ public:
 	double CursorX, CursorY;
 	bool Init();
 	void ProcessInput();
-	void Render();
+	void Render(float deltaTime);
 	void Update();
 private:
 	uint32_t m_Material;

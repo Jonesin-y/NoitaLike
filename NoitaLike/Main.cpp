@@ -99,11 +99,14 @@ int main()
 	if (!NoitaLike.Init())
 		printf("游戏初始化失败!\n");
 	EnableOpenGLDebugging();
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	glfwSetKeyCallback(window,key_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 	glfwSetCursorPosCallback(window,cursor_pos_callback);
 
-	glClearColor(0.0f,0.0f,0.0f,1.0f);
+	glClearColor(0.1f,0.1f,0.1f,1.0f);
 	float accumulator = 0.0f;
 	float deltaTime = 0.0f;
 	float currentTime = 0.0f;
@@ -120,7 +123,7 @@ int main()
 			NoitaLike.Update();
 		}
 		glClear(GL_COLOR_BUFFER_BIT);
-		NoitaLike.Render();
+		NoitaLike.Render(deltaTime);
 
 		glfwSwapBuffers(window);
 	}

@@ -78,12 +78,36 @@ void Game::ProcessInput()
 	}
 	else if (Keys[GLFW_KEY_4] == false && ProcessedKeys[GLFW_KEY_4] == true)
 		ProcessedKeys[GLFW_KEY_4] = false;
+	if (Keys[GLFW_KEY_5] == true && ProcessedKeys[GLFW_KEY_5] == false)
+	{
+		m_Material = 6;
+		std::cout << m_Material << std::endl;
+		ProcessedKeys[GLFW_KEY_5] = true;
+	}
+	else if (Keys[GLFW_KEY_5] == false && ProcessedKeys[GLFW_KEY_5] == true)
+		ProcessedKeys[GLFW_KEY_5] = false;
+	if (Keys[GLFW_KEY_6] == true && ProcessedKeys[GLFW_KEY_6] == false)
+	{
+		m_Material = 7;
+		std::cout << m_Material << std::endl;
+		ProcessedKeys[GLFW_KEY_6] = true;
+	}
+	else if (Keys[GLFW_KEY_6] == false && ProcessedKeys[GLFW_KEY_6] == true)
+		ProcessedKeys[GLFW_KEY_6] = false;
+	if (Keys[GLFW_KEY_7] == true && ProcessedKeys[GLFW_KEY_7] == false)
+	{
+		m_Material = 8;
+		std::cout << m_Material << std::endl;
+		ProcessedKeys[GLFW_KEY_7] = true;
+	}
+	else if (Keys[GLFW_KEY_7] == false && ProcessedKeys[GLFW_KEY_7] == true)
+		ProcessedKeys[GLFW_KEY_7] = false;
 
 }
 
-void Game::Render()
+void Game::Render(float deltaTime)
 {
-	m_World->Render();
+	m_World->Render(deltaTime);
 }
 
 void Game::Update()
