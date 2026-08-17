@@ -1,6 +1,7 @@
 #pragma once
 
 #include"Core.h"
+#include"Buffer.h"
 #include"Cell.h"
 #include"Chunk.h"
 #include <vector>
@@ -19,10 +20,11 @@ public:
 	void SetRandomScaleCells(int worldx,int worldy, int radius,Cell cell);
 
 private:
-	Ref(Texture2D)m_Texture2D;
+	Ref(Texture2D)m_srcTexture2D,m_MainTexture2D,m_ExtractTexture2D,m_pingpongTexture2D[2];
 	Ref(VertexArray)m_VAO;
-	Ref(Shader)m_Shader;
-	
+	Ref(FrameBuffer)m_MainFBO,m_ExtractFBO,m_pingpongFBO[2];
+	Ref(Shader)m_BaseShader,m_ExtractShader, m_BlurShader,m_CombineShader;
+
 	std::vector<Ref(Chunk)>m_Chunks;
 	std::vector<Ref(Chunk)>m_RedChunks;
 	std::vector<Ref(Chunk)>m_BlueChunks;

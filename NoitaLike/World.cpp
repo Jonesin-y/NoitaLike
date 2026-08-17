@@ -1,6 +1,7 @@
 #include "pch.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <GLFW/glfw3.h>
 #include "Texture2D.h"
 #include "VertexArray.h"
 #include "Shader.h"
@@ -19,10 +20,34 @@ World::World(int width, int height)
 {
 	m_Cells.resize(m_Width * m_Height, Cell(AIR));
 	
-	m_Shader = std::make_shared<Shader>("Assets/Shader/test.vs", "Assets/Shader/test.fs","TestShader");
+	m_BaseShader = std::make_shared<Shader>("Assets/Shader/Base.vs", "Assets/Shader/Base.fs","BaseShader");
+	m_ExtractShader = std::make_shared<Shader>("Assets/Shader/Extract.vs", "Assets/Shader/Extract.fs", "ExtractShader");
+	m_BlurShader = std::make_shared<Shader>("Assets/Shader/Blur.vs", "Assets/Shader/Blur.fs", "BlurShader");
+	m_CombineShader = std::make_shared<Shader>("Assets/Shader/Combine.vs", "Assets/Shader/Combine.fs", "CombineShader");
+
+	m_srcTexture2D = std::make_shared<Texture2D>(m_Width, m_Height);
+	m_MainTexture2D = std::make_shared<Texture2D>(m_Width, m_Height);
+	m_ExtractTexture2D = std::make_shared<Texture2D>(m_Width, m_Height);
+	m_pingpongTexture2D[0] = std::make_shared<Texture2D>(m_Width, m_Height);
+	m_pingpongTexture2D[1] = std::make_shared<Texture2D>(m_Width, m_Height);
+
+	m_MainFBO = std::make_shared<FrameBuffer>();
+	m_MainFBO->Bind(GL_FRAMEBUFFER);
+	m_MainFBO->AddTexture2D(m_MainTexture2D->GetID());
+
+	m_ExtractFBO = std::make_shared<FrameBuffer>();
+	m_ExtractFBO->Bind(GL_FRAMEBUFFER);
+	m_ExtractFBO->AddTexture2D(m_ExtractTexture2D->GetID());
+
+	m_pingpongFBO[0] = std::make_shared<FrameBuffer>();
+	m_pingpongFBO[0]->Bind(GL_FRAMEBUFFER);
+	m_pingpongFBO[0]->AddTexture2D(m_pingpongTexture2D[0]->GetID());
+	m_pingpongFBO[1] = std::make_shared<FrameBuffer>();
+	m_pingpongFBO[1]->Bind(GL_FRAMEBUFFER);
+	m_pingpongFBO[1]->AddTexture2D(m_pingpongTexture2D[1]->GetID());
+
 	m_VAO = std::make_shared<VertexArray>();
-	m_Texture2D = std::make_shared<Texture2D>(m_Width, m_Height);
-	m_Texture2D->Bind(0);
+	m_srcTexture2D->Bind(0);
 	for (int y = 0;y < m_Height >> CHUNK_SHIFT;++y)
 	{
 		for (int x = 0;x < m_Width >> CHUNK_SHIFT;++x)
@@ -53,9 +78,9 @@ World::World(int width, int height)
 	model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 	model = glm::scale(model, glm::vec3(m_Width, m_Height, 0.0f));
 	projection = glm::ortho(0.0f, (float)m_Width, (float)m_Height, 0.0f, -1.0f, 1.0f);
-	m_Shader->SetUniformMat4f("u_model", 1, GL_FALSE, &model[0][0]);
-	m_Shader->SetUniformMat4f("u_view", 1, GL_FALSE, &view[0][0]);
-	m_Shader->SetUniformMat4f("u_projection", 1, GL_FALSE, &projection[0][0]);
+	m_BaseShader->SetUniformMat4f("u_model", 1, GL_FALSE, &model[0][0]);
+	m_BaseShader->SetUniformMat4f("u_view", 1, GL_FALSE, &view[0][0]);
+	m_BaseShader->SetUniformMat4f("u_projection", 1, GL_FALSE, &projection[0][0]);
 	float vertices[] =
 	{
 		0.0f,0.0f,0.0f,0.0f,
@@ -88,7 +113,7 @@ void World::Update()
 	current_frame = (current_frame + 1) & 255;
 
 	//static int offset = 0;
-	//offset = rand() % 64 - 32;
+	//offset = static_cast<int>(FastRandRange(rand_state, 64)) - 32;
 	//UpdateChunkBoundary(offset);
 
 	int leftOrRight = Toogle;
@@ -143,28 +168,72 @@ void World::Update()
 
 void World::Render(float deltaTime)
 {
-
-	m_Shader->Bind();
 	m_VAO->Bind();
-	m_Texture2D->Bind(0);
 	
+	m_MainFBO->Bind(GL_FRAMEBUFFER);
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		// 输出具体状态
+	}
+	m_BaseShader->Bind();
+	m_srcTexture2D->Bind(0);
+	glViewport(0, 0, m_Width, m_Height);
+	glClear(GL_COLOR_BUFFER_BIT);
+	
+
 	for (int y = 0;y < m_ChunkCountY;++y)
 	{
 		for (int x = 0;x < m_ChunkCountX;++x)
 		{
 			if (!m_Chunks[y * m_ChunkCountX + x]->is_Dirty)
 				continue;
-			m_Chunks[y * m_ChunkCountX + x]->UpdateTexData(m_Cells,deltaTime);
+			m_Chunks[y * m_ChunkCountX + x]->UpdateTexData(m_Cells, deltaTime);
 			int chunk_width = m_Chunks[y * m_ChunkCountX + x]->end_x - m_Chunks[y * m_ChunkCountX + x]->start_x;
 			int chunk_height = m_Chunks[y * m_ChunkCountX + x]->end_y - m_Chunks[y * m_ChunkCountX + x]->start_y;
 			int textureXChunk = m_Chunks[y * m_ChunkCountX + x]->start_x;
 			int textureYChunk = m_Height - m_Chunks[y * m_ChunkCountX + x]->end_y;;
-			m_Texture2D->SubImage2D(textureXChunk,textureYChunk,chunk_width,chunk_height,m_Chunks[y * m_ChunkCountX + x]->TexData.data());
+			m_srcTexture2D->SubImage2D(textureXChunk, textureYChunk, chunk_width, chunk_height, m_Chunks[y * m_ChunkCountX + x]->TexData.data());
 			m_Chunks[y * m_ChunkCountX + x]->is_Dirty = false;
 		}
 	}
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 
-	glDrawElements(GL_TRIANGLES,6,GL_UNSIGNED_INT,nullptr);
+	m_ExtractFBO->Bind(GL_FRAMEBUFFER);
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		// 输出具体状态
+	}
+	m_ExtractShader->Bind();
+	m_MainTexture2D->Bind(0);
+	glViewport(0, 0, m_Width, m_Height);
+
+	glClear(GL_COLOR_BUFFER_BIT);
+	
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+
+	bool horizontal = true, first_iteration = true;
+	int amount = 10;
+	m_BlurShader->Bind();
+	for (unsigned int i = 0;i < amount;i++)
+	{
+		m_pingpongFBO[horizontal]->Bind(GL_FRAMEBUFFER);
+		m_BlurShader->SetUniform1i("u_horizontal", horizontal);
+		first_iteration ? m_ExtractTexture2D->Bind(0) : m_pingpongTexture2D[!horizontal]->Bind(0);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+		horizontal = !horizontal;
+		if (first_iteration)
+			first_iteration = false;
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	glViewport(0, 0, 1024, 1024);
+
+	glClear(GL_COLOR_BUFFER_BIT);
+	m_CombineShader->Bind(); 
+	m_MainTexture2D->Bind(0);
+	m_pingpongTexture2D[!horizontal]->Bind(1);
+	m_CombineShader->SetUniform1i("u_scene", 0);
+	m_CombineShader->SetUniform1i("u_bloomBlur", 1);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 }
 
 void World::SetCircleCells(int worldx, int worldy, int radius, Cell cell)
@@ -206,7 +275,7 @@ void World::SetRandomScaleCells(int worldx, int worldy, int radius,Cell cell)
 		{
 			int dx = x - worldx;
 			int dy = y - worldy;
-			if (rand() % 100 < 4 && dx * dx + dy * dy <= radius * radius)
+			if (FastRandRange(rand_state, 100) < 4 && dx * dx + dy * dy <= radius * radius)
 			{
 				int rect_x = x >> ACTIVE_RECT_SHIFT;
 				int rect_y = y >> ACTIVE_RECT_SHIFT;

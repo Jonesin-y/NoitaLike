@@ -4,13 +4,13 @@
 #include<vector>
 enum ShaderDataType
 {
-	NONE = 0, Float1, Float2, Float3, Float4, Mat3, Mat4, Int1, Int2, Int3, Int4, Bool
+	NONETYPE = 0, Float1, Float2, Float3, Float4, Mat3, Mat4, Int1, Int2, Int3, Int4, Bool
 };
 inline unsigned int ShaderDataTypeToSize(ShaderDataType dataType)
 {
 	switch (dataType)
 	{
-	case NONE:__debugbreak;
+	case NONETYPE:__debugbreak;
 	case Float1: return 4;
 	case Float2: return 4 * 2;
 	case Float3: return 4 * 3;
@@ -29,7 +29,7 @@ inline unsigned int ShaderDataTypeToCount(ShaderDataType dataType)
 {
 	switch (dataType)
 	{
-	case NONE:__debugbreak;
+	case NONETYPE:__debugbreak;
 	case Float1: return 1;
 	case Float2: return 2;
 	case Float3: return 3;
@@ -49,7 +49,7 @@ inline GLenum ShaderDataTypeToGladType(ShaderDataType dataType)
 {
 	switch (dataType)
 	{
-	case NONE:__debugbreak;
+	case NONETYPE:__debugbreak;
 	case Float1: return GL_FLOAT;
 	case Float2: return GL_FLOAT;
 	case Float3: return GL_FLOAT;

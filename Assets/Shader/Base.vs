@@ -1,6 +1,6 @@
 #version 430
 layout (location = 0) in vec2 position;
-layout (location = 0) in vec2 TexCoord;
+layout (location = 1) in vec2 TexCoord;
 out vec2 f_TexCoord;
 uniform mat4 u_model;
 uniform mat4 u_view;

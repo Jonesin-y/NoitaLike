@@ -6,6 +6,8 @@ class Texture2D
 public:
 	Texture2D(const std::string fileName);
 	Texture2D(int width, int height);
+	Texture2D(int width, int height,GLenum rgb_type);
+
 	Texture2D(int width, int height,const void* Texdata);
 	~Texture2D();
 	void Bind(unsigned int slot);

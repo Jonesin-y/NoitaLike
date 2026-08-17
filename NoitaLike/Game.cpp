@@ -102,6 +102,22 @@ void Game::ProcessInput()
 	}
 	else if (Keys[GLFW_KEY_7] == false && ProcessedKeys[GLFW_KEY_7] == true)
 		ProcessedKeys[GLFW_KEY_7] = false;
+	if (Keys[GLFW_KEY_8] == true && ProcessedKeys[GLFW_KEY_8] == false)
+	{
+		m_Material = 9;
+		std::cout << m_Material << std::endl;
+		ProcessedKeys[GLFW_KEY_8] = true;
+	}
+	else if (Keys[GLFW_KEY_8] == false && ProcessedKeys[GLFW_KEY_8] == true)
+		ProcessedKeys[GLFW_KEY_8] = false;
+	if (Keys[GLFW_KEY_9] == true && ProcessedKeys[GLFW_KEY_9] == false)
+	{
+		m_Material = 10;
+		std::cout << m_Material << std::endl;
+		ProcessedKeys[GLFW_KEY_9] = true;
+	}
+	else if (Keys[GLFW_KEY_9] == false && ProcessedKeys[GLFW_KEY_9] == true)
+		ProcessedKeys[GLFW_KEY_9] = false;
 
 }
 

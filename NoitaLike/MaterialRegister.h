@@ -8,6 +8,8 @@
 #define FIRE  6
 #define SMOKE 7
 #define STEAM 8
+#define ACID 9
+#define ACID_STEAM 10
 namespace Materials
 {
 	struct Properties
@@ -22,6 +24,8 @@ namespace Materials
 		int turbulence;					//4 湍流(概率属性)						:湍流越大，固体越有可能优先往斜向移动
 		int disappear_probility;		//4 消失概率(概率属性)					:概率越大，物体越容易随时间消失
 		int smoke_emission;				//4 烟雾排放概率(概率属性)				:概率越大，物体越容易产生烟雾
+		int sour;						//4 酸性(概率属性)						:酸性越大，物体越容易腐蚀其它可被腐蚀物
+		int corrosion;					//4 腐蚀性(概率属性)					:腐蚀性越大，物体越容易被酸腐蚀
 		int gravity;					//4	重力
 		int t_speed;					//4 基础竖直移动速率							
 		int s_speed;					//4 基础水平移动速率					
@@ -33,16 +37,19 @@ namespace Materials
 		bool is_gas;					//1	是否是气体
 	};
 	constexpr Properties Registry[256] =
-	{//	 density		hardness	flammablity		vaporize		viscosity	slip_probility		slide_probility		turbulence	disappear_probility		smoke_emossion,	gravity		t_speed		s_speed		color_var	color							relevant_material	is_liquid	is_fire		is_gas
-		{99999.0f,		99999.0f,	0,				0,				99999,		0,					0,					0,			0,						0,				0,			0,			0,			0,		0,									NONE				,false		,false		,false}, //虚无物质 0
-		{0.0f,			0.0f,		0,				0,				0,			0,					0,					0,			0,						0,				0,			1,			1,			0,		0,									AIR					,false		,false		,false}, //空气 1
-		{1.5f,			2.0f,		0,				0,				0,			50,					30,					0,			0,						0,				1,			3,			2,			16,		194|178<<8|128<<16|255<<24,			SAND				,false		,false		,false}, //沙子 2
-		{1.0f,			0.5f,		0,				100,			30,			0,					0,					0,			0,						0,				1,			5,			5,			0,		15 | 94<<8|156<<16|150<<24,			STEAM				,true		,false		,false}, //水 3
-		{10.0f,			20.0f,		0,				0,				0,			0,					30,					0,			0,						0,				0,			0,			0,			32,		140|142<<8|145<<16|255<<24,			STONE				,false		,false		,false}, //石头 4
-		{1.5f,			3.0f,		30,				0,				0,			0,					0,					0,			0,						0,				0,			0,			0,			32,		100| 65<<8|30 <<16|255<<24,			WOOD				,false		,false		,false}, //木头 5
-		{0.3f,			0.3f,		0,				0,				30,			0,					0,					0,			2,						1,				0,			2,			2,			64,		210|90<<8 |10<<16 |255<<24,			FIRE				,false		,true		,false}, //火焰 6
-		{-0.5f,			0.3f,		0,				0,				10,			30,					0,					5,			1,						0,				-1,			3,			2,			32,		50 |50<<8 |50<<16 |200<<24,			SMOKE				,false		,false		,true}, //烟雾 7
-		{-1.0f,			0.2f,		0,				0,				8,			40,					0,					20,			1,						0,				-1,			3,			3,			4,		122|181<<8|214<<16|100<<24,			STEAM				,false		,false		,true}, //水蒸气 8	 
+	{//	 density		hardness	flammablity		vaporize		viscosity	slip_probility		slide_probility		turbulence	disappear_probility		smoke_emossion	sour	corrosion		gravity		t_speed		s_speed		color_var	color							relevant_material	is_liquid	is_fire		is_gas
+		{99999.0f,		99999.0f,	0,				0,				99999,		0,					0,					0,			0,						0,				0,		0,				0,			0,			0,			0,			0,								NONE				,false		,false		,false}, //虚无物质 0
+		{0.0f,			0.0f,		0,				0,				0,			0,					0,					0,			0,						0,				0,		0,				0,			1,			1,			0,			0,								AIR					,false		,false		,false}, //空气 1
+		{2.5f,			2.0f,		0,				0,				0,			50,					30,					0,			0,						0,				0,		50,				1,			3,			2,			16,			194|178<<8|128<<16|255<<24,		SAND				,false		,false		,false}, //沙子 2
+		{1.0f,			0.5f,		0,				100,			30,			0,					0,					0,			0,						0,				0,		0,				1,			5,			5,			0,			15 | 94<<8|156<<16|150<<24,		STEAM				,true		,false		,false}, //水 3
+		{10.0f,			20.0f,		0,				0,				0,			0,					30,					0,			0,						0,				0,		0,				0,			0,			0,			32,			140|142<<8|145<<16|255<<24,		STONE				,false		,false		,false}, //石头 4
+		{1.5f,			3.0f,		30,				0,				0,			0,					0,					0,			0,						0,				0,		75,				0,			0,			0,			32,			100| 65<<8|30 <<16|255<<24,		WOOD				,false		,false		,false}, //木头 5
+		{0.3f,			0.3f,		0,				0,				30,			0,					0,					0,			2,						1,				0,		0,				0,			2,			2,			64,			210|90<<8 |10<<16 |254<<24,		FIRE				,false		,true		,false}, //火焰 6
+		{-0.5f,			0.3f,		0,				0,				10,			30,					0,					5,			1,						0,				0,		0,				-1,			3,			2,			32,			50 |50<<8 |50<<16 |200<<24,		SMOKE				,false		,false		,true}, //烟雾 7
+		{-1.0f,			0.2f,		0,				0,				8,			40,					0,					20,			1,						0,				0,		0,				-1,			3,			3,			4,			122|181<<8|214<<16|100<<24,		STEAM				,false		,false		,true}, //水蒸气 8	 
+		{1.2f,			0.5f,		0,				100,			30,			50,					0,					0,			0,						0,				30,		0,				1,			4,			3,			0,			105|135<<8|28 <<16|254<<24,		ACID_STEAM			,true		,false		,false}, //酸液 9
+		{-1.0f,			0.5f,		0,				0,				0,			40,					0,					10,			1,						0,				0,		0,				-1,			3,			3,			4,			186|255<<8|125<<16|100<<24,		ACID_STEAM			,false		,false		,true}, //酸液蒸汽 10
+
 		//待补充
 	};
 }
