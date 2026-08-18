@@ -4,6 +4,7 @@
 #include<glm/glm.hpp>
 #include<glm/matrix.hpp>
 class World;
+class Texture2D;
 class Game
 {
 public:
@@ -15,9 +16,13 @@ public:
 	bool Init();
 	void ProcessInput();
 	void Render(float deltaTime);
+	void ImGuiRender();
+	void DrawRightToolbar();
 	void Update();
 private:
+
 	uint32_t m_Material;
+	Ref(Texture2D)m_DrawPenTexture;
 	Ref(World) m_World;
 	std::string m_Name;
 	int m_Width, m_Height;

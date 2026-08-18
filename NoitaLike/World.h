@@ -16,6 +16,7 @@ public:
 	void Update();
 	//void UpdateChunkBoundary(int offset);动态边界核心函数
 	void Render(float deltaTime);
+	void OnImguiRender();
 	void SetCircleCells(int worldx, int worldy, int radius, Cell cell);
 	void SetRandomScaleCells(int worldx,int worldy, int radius,Cell cell);
 

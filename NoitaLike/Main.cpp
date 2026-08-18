@@ -1,13 +1,15 @@
 #include"pch.h"
 #include <windows.h>
 #include <GLFW/glfw3.h>
-
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+#include <imgui.h>
 #include <glad/glad.h>
 #include"Game.h"
 
 const int WINDOW_WIDTH = 1024;
 const int WINDOW_HEIGHT = 1024;
-float FIXED_FRAME = 1 / 144.0f;
+float FIXED_FRAME = 1 / 60.0f;
 Game NoitaLike(512.0f, 512.0f, WINDOW_WIDTH, WINDOW_HEIGHT, "NoitaLike");
 void glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
 {
@@ -101,10 +103,29 @@ int main()
 	EnableOpenGLDebugging();
 	glDisable(GL_BLEND);
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-
-	glfwSetKeyCallback(window,key_callback);
+	glfwSetKeyCallback(window, key_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
-	glfwSetCursorPosCallback(window,cursor_pos_callback);
+	glfwSetCursorPosCallback(window, cursor_pos_callback);\
+	//ImGui初始化设置
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO();
+	
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+	ImGui::StyleColorsLight();
+	ImGuiStyle& style = ImGui::GetStyle();
+	style.WindowPadding = ImVec2(4.0f, 8.0f);
+	style.FramePadding = ImVec2(4.0f, 4.0f);
+	style.ItemSpacing = ImVec2(8.0f, 4.0f);
+	style.ItemInnerSpacing = ImVec2(4.0f, 4.0f);
+	style.FrameBorderSize = 1.0f;
+
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplOpenGL3_Init("#version 430");
+
+	
 
 	float accumulator = 0.0f;
 	float deltaTime = 0.0f;
@@ -115,16 +136,36 @@ int main()
 		currentTime = glfwGetTime();
 		accumulator += deltaTime;
 		glfwPollEvents();
+		
+		glClear(GL_COLOR_BUFFER_BIT);
+		NoitaLike.Render(deltaTime);
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+
+		NoitaLike.ImGuiRender();
 		if (accumulator >= FIXED_FRAME)
 		{
 			accumulator -= FIXED_FRAME;
-			NoitaLike.ProcessInput();
+			if (!io.WantCaptureMouse && !io.WantCaptureKeyboard)
+				NoitaLike.ProcessInput();
 			NoitaLike.Update();
 		}
-		glClear(GL_COLOR_BUFFER_BIT);
-		NoitaLike.Render(deltaTime);
 
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		if (io.ConfigFlags && ImGuiConfigFlags_ViewportsEnable)
+		{
+			GLFWwindow* backup_context = glfwGetCurrentContext();
+			ImGui::UpdatePlatformWindows();
+			ImGui::RenderPlatformWindowsDefault();
+			glfwMakeContextCurrent(backup_context);
+		}
 		glfwSwapBuffers(window);
 	}
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+
 	glfwTerminate();
 }

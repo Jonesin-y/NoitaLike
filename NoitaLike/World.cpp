@@ -236,6 +236,10 @@ void World::Render(float deltaTime)
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 }
 
+void World::OnImguiRender()
+{
+}
+
 void World::SetCircleCells(int worldx, int worldy, int radius, Cell cell)
 {
 	int startX = std::max(0,worldx - radius);
